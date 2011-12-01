@@ -7,7 +7,7 @@
 
 # Commentary
 
-There are 5 pentamino tiles, made up of 5 connected squares. These may be used to tile the plane. Gento is a gtk implementation of the pentamino game. The player is presented with a 5x4, 5x5, up to 5x12 board and with the corresponding number of pentamino tiles. Move these around with the stylus or the keyboard, and use [R] to rotate, [F] to flip, and [N] for a new game.
+There are alltogether 12 pentamino tiles, made up of 5 connected squares. These may be used to tile the plane. Gento is a gtk implementation of a game where the player gets to tile the plane, which is more difficult than it seems. The player is presented with a 5x4, 5x5, up to 5x12 board and with the corresponding number of pentamino tiles. Move these around with the stylus or the keyboard, and use [R] to rotate, [F] to flip, and [N] for a new game.
 
 For more information about Pentaminos see:
 
