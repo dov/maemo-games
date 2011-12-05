@@ -17,18 +17,21 @@
 ######################################################################
 
 import gtk
+import glib
 from gtk import keysyms
 import math
 import goocanvas
 import random
+import datetime
 
 # The numeric contents of a tile
 class Tile:
-  def __init__(self):
+  def __init__(self, solution_pos):
     self.n=int(random.random()*10)
     self.e=int(random.random()*10)
     self.s=int(random.random()*10)
     self.w=int(random.random()*10)
+    self.solution_pos = solution_pos
 
 # VexTile contains the playable pieces of the game.
 class VexTile(goocanvas.Group):
@@ -40,7 +43,8 @@ class VexTile(goocanvas.Group):
                num_east,
                x0,
                y0,
-               tile_size) :
+               tile_size,
+               solution_pos):
     goocanvas.Group.__init__(self,parent=parent)
     s=tile_size # shortcut
     s2=s/2
@@ -95,6 +99,8 @@ class VexTile(goocanvas.Group):
                              fill_color=fg
                              )
     self.translate(x0,y0)
+    self.solution_pos = solution_pos
+    self.board_pos = None
 
   # Return the color corresponding to a number
   def get_triangle_color(self,num):
@@ -152,27 +158,41 @@ class Goovex(gtk.Window):
     xsubtract = self.xmargin+self.tile_size/2
     ysubtract = self.ymargin+self.tile_size/2
 
+    in_solution_area = True
     if x > self.xmargin + self.tile_size * (0.5+self.board_size):
       xsubtract += self.xmargin + self.board_size*self.tile_size
+      in_solution_area = False
 
     x-= xsubtract
     y-= ysubtract
     
     # The following complex math was created in order to make
     # tile always fall on top of the board.
-    xq = (math.floor(x/self.tile_size+0.5))*self.tile_size
-    yq = (math.floor(y/self.tile_size+0.5))*self.tile_size
+    board_pos_x = int(math.floor(x/self.tile_size+0.5))
+    xq = board_pos_x*self.tile_size
+    board_pos_y = int(math.floor(y/self.tile_size+0.5))
+    yq = board_pos_y*self.tile_size
     xq+= xsubtract
     yq+= ysubtract
     trans.translate(xq-trans[4],yq-trans[5])
     item.set_transform(trans)
+
     # TBD place the tile on the board
+    if in_solution_area:
+      item.board_pos = (board_pos_x,board_pos_y)
+    else:
+      item.board_pos = None
+
+    if self.IsSolved():
+      self.game_finished=True
+
+      # TBD popup result and write it into a file etc.
 
   # Create a random board. 
   def get_board(self, board_size):
     board=[]
     for i in range(board_size*board_size):
-      board.append(Tile())
+      board.append(Tile(i))
     # Make adjacent numbers the same using some clever looping
     for i in range(1,board_size):
       for j in range(board_size):
@@ -190,10 +210,12 @@ class Goovex(gtk.Window):
 
   # Erase the current pieces and create new ones
   def new_game(self, board_size):
+    self.StartTimer()
     root = self.canvas.get_root_item()
     board = self.get_board(board_size)
     self.tile_size = 300/board_size
     self.board_size = board_size
+    self.game_finished = False
 
     # Erase the old board
     for t in self.tiles:
@@ -213,7 +235,8 @@ class Goovex(gtk.Window):
         ht = VexTile(root, n,e,s,w,
                      2*self.xmargin + self.tile_size*(board_size+i+0.5),
                      1*self.ymargin + self.tile_size*(j+0.5),
-                     self.tile_size)
+                     self.tile_size,
+                     board[p].solution_pos)
         self.setup_item_signals(ht)
         self.tiles.append(ht)
 
@@ -238,9 +261,16 @@ class Goovex(gtk.Window):
                                    stroke_color=None,
                                    line_width=0)]
 
-  def is_solved(self):
-    """Check if the game has been solved - Pending creation of a board"""
-      
+  def IsSolved(self):
+    """Check if the game has has been solved by examining if the
+    position of each tile corresponds to the solution position."""
+    for t in self.tiles:
+      if t.board_pos is None:
+        return False
+      xq,yq = t.board_pos
+      if yq*self.board_size+xq != t.solution_pos:
+        return False
+    return True
 
   def LetterButton(self,
                    parent=None,
@@ -287,6 +317,18 @@ class Goovex(gtk.Window):
   def NewGame5(self,*args):
     self.new_game(board_size=5)
 
+  def TimerTick(self):
+    if self.game_finished:
+      return False
+    td=datetime.datetime.now()-self.Timer0
+    dt=td.seconds+td.microseconds * 1e-6
+    self.TimerText.props.text = "%4.1fs"%dt
+    return True
+
+  def StartTimer(self):
+    self.Timer0 = datetime.datetime.now()
+    glib.timeout_add(100, self.TimerTick)
+
   def __init__(self):
     gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
     self.xmargin=50
@@ -327,7 +369,14 @@ class Goovex(gtk.Window):
                       text="5",
                       x=40+90*4,y=420-80,
                       cb = self.NewGame5)
-
+    self.TimerText = goocanvas.Text(parent = root,
+                     anchor=gtk.ANCHOR_SOUTH,
+                     x=570,
+                     y=420,
+                     font="Sans Bold 36",
+                     text="0.0s",
+                     fill_color="red")
+    self.StartTimer()
     self.show_all()
     self.tiles=[]
     self.grid = []
